@@ -13,7 +13,9 @@ const HEADERS: [(&'static str, &'static str); 4] = [
 ];
 
 async fn handle_request(Path(name): Path<String>) -> impl IntoResponse {
-    let config = aws_config::load_from_env().await;
+    dotenv::dotenv().ok();
+
+    let config = aws_config::from_env().load().await;
     let client = aws_sdk_dynamodb::Client::new(&config);
 
     let now = SystemTime::now();
@@ -24,7 +26,6 @@ async fn handle_request(Path(name): Path<String>) -> impl IntoResponse {
         .key("platform", AttributeValue::S("IAP Online".to_string()))
         .send()
         .await
-        .ok()
         .unwrap();
 
     println!("{:?}", now.elapsed().unwrap().as_millis());
@@ -43,9 +44,21 @@ async fn handle_request(Path(name): Path<String>) -> impl IntoResponse {
     );
 }
 
+async fn handle_basic() -> impl IntoResponse {
+    (
+        HEADERS,
+        json!({
+            "message": "success",
+        })
+        .to_string(),
+    )
+}
+
 #[tokio::main]
 async fn main() {
-    let app = Router::new().route("/bench/:name", get(handle_request));
+    let app = Router::new()
+        .route("/bench/:name", get(handle_request))
+        .route("/", get(handle_basic));
     let port_number: u16 = str::parse("3000").unwrap();
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port_number));
